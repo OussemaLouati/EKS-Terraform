@@ -1,0 +1,46 @@
+---
+apiVersion: karpenter.sh/v1alpha5
+kind: Provisioner
+metadata:
+  name: feature-branch-node-provisioner
+spec:
+  ttlSecondsAfterEmpty: 180 # scale down after 3 minutes
+  ttlSecondsUntilExpired: 604800 # expire nodes after 7 days (in seconds) = 7 * 60 * 60 * 24
+  limits:
+    resources:
+      cpu: 512 # limit to 100 CPUs cores
+      memory: 512Gi # limit to 100 CPUs cores
+  requirements:
+    # Include general purpose instance families
+  - key: node.kubernetes.io/instance-type
+    operator: In
+    values:
+    - m5a.2xlarge
+    - c5a.8xlarg
+  - key: karpenter.sh/capacity-type
+    operator: In
+    values: ["spot", "on-demand"]
+  taints:
+  - effect: NoSchedule
+    key: deployment/feature
+    value: "true"
+  labels:
+    node-restriction.mlops.eks.com/purpose: Feature-Branch
+  providerRef:
+    name: provider-feature-branch
+---
+apiVersion: karpenter.k8s.aws/v1alpha1
+kind: AWSNodeTemplate
+metadata:
+  name: provider-feature-branch
+spec:
+  subnetSelector:
+    kubernetes.io/cluster/dev-cluster: shared
+  securityGroupSelector:
+    kubernetes.io/cluster/dev-cluster: owned
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeType: gp3
+        volumeSize: 50Gi
+        deleteOnTermination: true

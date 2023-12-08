@@ -1,0 +1,42 @@
+---
+apiVersion: karpenter.sh/v1alpha5
+kind: Provisioner
+metadata:
+  name: workflows-node-provisioner
+spec:
+  ttlSecondsAfterEmpty: 180 # scale down after 3 minutes
+  ttlSecondsUntilExpired: 604800 # expire nodes after 7 days (in seconds) = 7 * 60 * 60 * 24
+  limits:
+    resources:
+      cpu: 160 # limit to 100 CPUs cores
+      memory: 128Gi # limit to 100 CPUs cores
+  requirements:
+    # Include general purpose instance families
+  - key: node.kubernetes.io/instance-type
+    operator: In
+    values:
+    - c5a.8xlarge
+  taints:
+  - effect: NoSchedule
+    key: workload/argo
+    value: "true"
+  labels:
+    node-restriction.mlops.eks.com/purpose: Argo
+  providerRef:
+    name: provider-workflows
+---
+apiVersion: karpenter.k8s.aws/v1alpha1
+kind: AWSNodeTemplate
+metadata:
+  name: provider-workflows
+spec:
+  subnetSelector:
+    kubernetes.io/cluster/dev-cluster: shared
+  securityGroupSelector:
+    kubernetes.io/cluster/dev-cluster: owned
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeType: gp3
+        volumeSize: 200Gi
+        deleteOnTermination: true

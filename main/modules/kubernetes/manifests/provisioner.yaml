@@ -1,0 +1,41 @@
+---
+apiVersion: karpenter.sh/v1alpha5
+kind: Provisioner
+metadata:
+  name: gpu-node-provisioner
+spec:
+  ttlSecondsAfterEmpty: 180 # scale down after 3 minutes
+  ttlSecondsUntilExpired: 604800 # expire nodes after 7 days (in seconds) = 7 * 60 * 60 * 24
+  limits:
+    resources:
+      nvidia.com/gpu: 2 # limit to 1 GPU cores
+  requirements:
+    # Include general purpose instance families
+  - key: node.kubernetes.io/instance-type
+    operator: In
+    values:
+    - p3.2xlarge
+  taints:
+  - effect: NoSchedule
+    key: nvidia.com/gpu
+    value: "present"
+  labels:
+    node-restriction.mlops.eks.com/purpose: Argo
+  providerRef:
+    name: provider
+---
+apiVersion: karpenter.k8s.aws/v1alpha1
+kind: AWSNodeTemplate
+metadata:
+  name: provider
+spec:
+  subnetSelector:
+    kubernetes.io/cluster/dev-cluster: shared
+  securityGroupSelector:
+    kubernetes.io/cluster/dev-cluster: owned
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeType: gp3
+        volumeSize: 250Gi
+        deleteOnTermination: true

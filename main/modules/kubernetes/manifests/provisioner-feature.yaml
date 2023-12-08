@@ -1,0 +1,41 @@
+---
+apiVersion: karpenter.sh/v1alpha5
+kind: Provisioner
+metadata:
+  name: dev-node-provisioner
+spec:
+  ttlSecondsAfterEmpty: 1800 # scale down after 3 minutes
+  limits:
+    resources:
+      cpu: 128 # limit to 100 CPUs cores
+      memory: 256Gi # limit to 100 CPUs cores
+  requirements:
+    # Include general purpose instance families
+  - key: node.kubernetes.io/instance-type
+    operator: In
+    values:
+    - c5a.8xlarge
+  taints:
+  - effect: NoSchedule
+    key: deployment/feature
+    value: "true"
+  labels:
+    node-restriction.mlops.eks.com/purpose: Dev
+  providerRef:
+    name: provider-dev
+---
+apiVersion: karpenter.k8s.aws/v1alpha1
+kind: AWSNodeTemplate
+metadata:
+  name: provider-dev
+spec:
+  subnetSelector:
+    kubernetes.io/cluster/dev-cluster: shared
+  securityGroupSelector:
+    kubernetes.io/cluster/dev-cluster: owned
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeType: gp3
+        volumeSize: 200Gi
+        deleteOnTermination: true
